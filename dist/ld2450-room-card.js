@@ -20,7 +20,7 @@
  * placed, so the plotted position matches where the person actually is.
  */
 
-const CARD_VERSION = "1.1.1";
+const CARD_VERSION = "1.2.0";
 
 /* Plain text, not a %c banner: console styling only takes literal colours
  * and nothing here should hardcode one. */
@@ -54,7 +54,7 @@ function unitOf(hass, entityId) {
  * — an idle radar still discovers cleanly and simply shows no dots.
  */
 function discover(hass, deviceId) {
-  const out = { targets: [], presence: null };
+  const out = { targets: [], presence: null, zones: [], zoneType: null };
   if (!hass || !deviceId || !hass.entities) return out;
 
   const devEnts = Object.keys(hass.entities).filter(
@@ -68,6 +68,21 @@ function discover(hass, deviceId) {
     if (!x || !y) continue;
     out.targets.push({ x, y, distance: find(`target_${n}_distance`) });
   }
+
+  /* The LD2450 region-filter zones, exposed as number entities by the ESPHome
+   * `number:` platform (zone_N_x1/y1/x2/y2). Only shown in the editor, to help
+   * place them; absent when the user hasn't exposed them. */
+  for (let z = 1; z <= 3; z++) {
+    const x1 = find(`zone_${z}_x1`);
+    const y1 = find(`zone_${z}_y1`);
+    const x2 = find(`zone_${z}_x2`);
+    const y2 = find(`zone_${z}_y2`);
+    if (x1 && y1 && x2 && y2) out.zones.push({ n: z, x1, y1, x2, y2 });
+  }
+  /* The zone mode (Disabled / Detection / Filter) applies to all zones. */
+  out.zoneType =
+    devEnts.find((e) => e.startsWith("select.") && /zone_type/.test(e)) || null;
+
   out.presence =
     devEnts.find((e) => e.startsWith("binary_sensor.") && /presence/.test(e)) ||
     null;
@@ -102,10 +117,14 @@ const BASE_CSS = `
   .pill-present.on { color:var(--primary-text-color); }
   .room { position:relative; width:100%; }
   .plan { width:100%; height:auto; display:block; }
-  /* The boresight is a setup aid — only shown while editing the card, when HA
-   * sets the host's preview property (reflected to the [preview] attr). */
+  /* The boresight and zones are setup aids — only shown while editing the card,
+   * when HA sets the host's preview property (reflected to the [preview] attr). */
   .boresight { display:none; }
   :host([preview]) .boresight { display:inline; }
+  .zone { display:none; fill-opacity:.14; stroke-opacity:.9; }
+  .zone-lbl { display:none; }
+  :host([preview]) .zone.on { display:inline; }
+  :host([preview]) .zone-lbl.on { display:inline; }
   .dot {
     position:absolute; transform:translate(-50%,-50%);
     display:none; align-items:center; justify-content:center;
@@ -215,6 +234,21 @@ class Ld2450RoomCard extends HTMLElement {
     return this.shadowRoot;
   }
 
+  /* Project a sensor-frame point (mm) into viewBox coordinates: flip X, rotate
+   * by the mount angle, then offset along the wall. Shared by the target dots
+   * and the zone outlines so both land in the same room frame. Unclamped. */
+  _projectVB(x, y) {
+    const c = this._config;
+    const g = this._geo;
+    const ex = c.flip_x ? -x : x;
+    const a = (c.sensor_angle * Math.PI) / 180;
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    const rx = ex * ca + y * sa;
+    const ry = -ex * sa + y * ca;
+    return { vx: g.M + rx + c.sensor_offset, vy: g.M + ry };
+  }
+
   _build(n) {
     const c = this._config;
     const W = c.room_width;
@@ -230,6 +264,8 @@ class Ld2450RoomCard extends HTMLElement {
     const stroke = Math.max(4, Math.round(M * 0.14));
     const rx = Math.round(Math.min(W, D) * 0.03);
     const fontSize = Math.round(vbW * 0.032);
+    const zStroke = Math.max(3, Math.round(M * 0.07));
+    const zDash = `${Math.round(M * 0.5)} ${Math.round(M * 0.35)}`;
 
     /* Boresight indicator: a short line from the sensor showing which way it
      * actually looks. Straight down the room at angle 0, tilting toward +X as
@@ -251,6 +287,20 @@ class Ld2450RoomCard extends HTMLElement {
       )
       .join("");
 
+    /* Three empty zone slots (polygon + centroid label). _updateZones fills
+     * the ones that resolve to real, non-degenerate zone numbers and hides the
+     * rest; CSS keeps them out of the live dashboard. */
+    const zones = Array.from({ length: 3 })
+      .map(
+        (_, i) =>
+          `<polygon class="zone" data-z="${i}" points="" ` +
+          `stroke-width="${zStroke}" stroke-dasharray="${zDash}"/>` +
+          `<text class="zone-lbl" data-z="${i}" font-size="${fontSize}" ` +
+          `text-anchor="middle" dominant-baseline="middle" ` +
+          `font-family="var(--paper-font-body1_-_font-family, sans-serif)"></text>`
+      )
+      .join("");
+
     const title = c.name || "";
     const head = title
       ? `<div class="head"><span class="title">${title}</span>` +
@@ -268,6 +318,7 @@ class Ld2450RoomCard extends HTMLElement {
             <rect x="${M}" y="${M}" width="${W}" height="${D}" rx="${rx}"
               fill="var(--ld2450-room-fill, var(--secondary-background-color))"
               stroke="var(--divider-color)" stroke-width="${stroke}"/>
+            ${zones}
             <line class="boresight" x1="${sx}" y1="${M}" x2="${bx}" y2="${by}"
               stroke="var(--secondary-text-color)" stroke-width="${Math.max(2, Math.round(M * 0.08))}"
               stroke-linecap="round"/>
@@ -283,6 +334,8 @@ class Ld2450RoomCard extends HTMLElement {
 
     this._present = this._shadow().getElementById("present");
     this._dots = Array.from(this._shadow().querySelectorAll(".dot"));
+    this._zonePolys = Array.from(this._shadow().querySelectorAll("polygon.zone"));
+    this._zoneLbls = Array.from(this._shadow().querySelectorAll("text.zone-lbl"));
   }
 
   _update(n) {
@@ -305,19 +358,12 @@ class Ld2450RoomCard extends HTMLElement {
         continue;
       }
 
-      const ex = c.flip_x ? -x : x;
-      /* Rotate the sensor-frame point into room axes when the radar is
-       * mounted at an angle to the wall. Positive angle tilts the boresight
-       * toward +X; the target's lateral position becomes rx, its depth ry. */
-      const a = (c.sensor_angle * Math.PI) / 180;
-      const ca = Math.cos(a);
-      const sa = Math.sin(a);
-      const rx = ex * ca + y * sa;
-      const ry = -ex * sa + y * ca;
-      /* Clamp inside the walls so noise or an out-of-room reflection rides
-       * the edge instead of flying off the card. */
-      let px = g.M + Math.min(Math.max(rx + c.sensor_offset, 0), g.W);
-      let py = g.M + Math.min(Math.max(ry, 0), g.D);
+      /* Project into the room frame (flip, rotate, offset), then clamp inside
+       * the walls so noise or an out-of-room reflection rides the edge instead
+       * of flying off the card. */
+      const p = this._projectVB(x, y);
+      const px = Math.min(Math.max(p.vx, g.M), g.M + g.W);
+      const py = Math.min(Math.max(p.vy, g.M), g.M + g.D);
 
       dot.style.left = (px / g.vbW) * 100 + "%";
       dot.style.top = (py / g.vbH) * 100 + "%";
@@ -331,6 +377,72 @@ class Ld2450RoomCard extends HTMLElement {
         : this._dots.some((d) => d.classList.contains("on"));
       this._present.textContent = on ? "occupied" : "clear";
       this._present.classList.toggle("on", on);
+    }
+
+    this._updateZones();
+  }
+
+  /* Draw the configured LD2450 region-filter zones as polygons in the room
+   * frame. Each zone's corners are projected the same way as target points, so
+   * an angled mount rotates the rectangle correctly. Coloured by mode (Filter
+   * red, Detection blue, else grey). Only visible in the editor via CSS. */
+  _updateZones() {
+    const polys = this._zonePolys || [];
+    const lbls = this._zoneLbls || [];
+    const zones = (this._ids && this._ids.zones) || [];
+    const st = this._ids && this._ids.zoneType && this._hass.states[this._ids.zoneType];
+    const mode = st ? st.state : null;
+    const color =
+      mode === "Filter" ? "#e5484d" : mode === "Detection" ? "#4c6ef5" : "#888888";
+
+    for (let i = 0; i < polys.length; i++) {
+      const poly = polys[i];
+      const lbl = lbls[i];
+      const z = zones[i];
+      const hide = () => {
+        poly.classList.remove("on");
+        if (lbl) lbl.classList.remove("on");
+      };
+      if (!z) {
+        hide();
+        continue;
+      }
+      const x1 = num(this._hass, z.x1);
+      const y1 = num(this._hass, z.y1);
+      const x2 = num(this._hass, z.x2);
+      const y2 = num(this._hass, z.y2);
+      /* An unset zone is 0,0,0,0; a zero-area zone can't be drawn — skip both. */
+      if (
+        x1 === null || y1 === null || x2 === null || y2 === null ||
+        x1 === x2 || y1 === y2
+      ) {
+        hide();
+        continue;
+      }
+
+      let cx = 0;
+      let cy = 0;
+      const pts = [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+        .map(([mx, my]) => {
+          const p = this._projectVB(mx, my);
+          cx += p.vx;
+          cy += p.vy;
+          return `${p.vx.toFixed(1)},${p.vy.toFixed(1)}`;
+        })
+        .join(" ");
+      poly.setAttribute("points", pts);
+      poly.style.fill = color;
+      poly.style.stroke = color;
+      poly.classList.add("on");
+
+      if (lbl) {
+        lbl.setAttribute("x", (cx / 4).toFixed(1));
+        lbl.setAttribute("y", (cy / 4).toFixed(1));
+        lbl.setAttribute("fill", "var(--secondary-text-color)");
+        lbl.textContent =
+          "Z" + z.n + (mode && mode !== "Disabled" ? " · " + mode : "");
+        lbl.classList.add("on");
+      }
     }
   }
 

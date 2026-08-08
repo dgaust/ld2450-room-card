@@ -11,6 +11,8 @@ room. No Lit, no CDN, no build step — one plain custom element.
   distance printed on the dot.
 - Discovers `target_N_x` / `target_N_y` / `target_N_distance` from the device
   automatically — no entity ids to wire up.
+- While editing the card, overlays the sensor's **facing direction** and any
+  configured **region-filter zones**, so you can place them by eye.
 - Idle radar → an empty room. A transient error never sticks.
 
 ## Requirements
@@ -85,6 +87,18 @@ right room position. While you're **editing the card**, a short line on the
 sensor marker shows the configured facing direction — tune the angle until it
 points the way the radar really looks (and if the whole scene rotates the wrong
 way, negate the angle). The line is hidden on the live dashboard.
+
+### Region-filter zones
+
+If the device exposes the LD2450's zone-coordinate number entities (the ESPHome
+`number:` platform: `zone_N_x1` / `zone_N_y1` / `zone_N_x2` / `zone_N_y2`), the
+card draws each configured zone as a dashed rectangle **while you're editing the
+card** — projected through the same flip/rotate/offset as the targets, so an
+angled mount rotates the zone correctly. Zones are coloured by the `zone_type`
+select: red for `Filter`, blue for `Detection`, grey otherwise. Unset or
+zero-area zones aren't drawn, and nothing zone-related shows on the live
+dashboard. There's no configuration — the zones are read straight from the
+device.
 
 ### Theming
 
