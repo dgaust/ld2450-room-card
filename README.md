@@ -1,0 +1,92 @@
+# LD2450 Room Card
+
+A dependency-free Lovelace card that plots the live position of the targets
+tracked by an **HLK-LD2450** (mmWave) radar onto a to-scale floor plan of the
+room. No Lit, no CDN, no build step — one plain custom element.
+
+![type:video](https://github.com/dgaust/ld2450-room-card) <!-- replace with a screenshot -->
+
+- Draws the room as a fixed-aspect rectangle, so it never scales oddly.
+- Places a coloured dot for each detected target (up to 3), with the target's
+  distance printed on the dot.
+- Discovers `target_N_x` / `target_N_y` / `target_N_distance` from the device
+  automatically — no entity ids to wire up.
+- Idle radar → an empty room. A transient error never sticks.
+
+## Requirements
+
+The [ESPHome LD2450 component](https://esphome.io/components/sensor/ld2450/)
+exposing, per target, the `x`, `y` and (optionally) `distance` sensors, all in
+**millimetres**. Any integration that produces `…target_N_x` / `…target_N_y`
+sensor entities on one device works.
+
+## Installation
+
+### HACS (recommended)
+
+1. HACS → ⋮ → **Custom repositories**.
+2. Add `https://github.com/dgaust/ld2450-room-card`, category **Dashboard**.
+3. Install **LD2450 Room Card**, then hard-refresh the browser.
+
+HACS registers the dashboard resource for you. If you installed manually,
+add the resource yourself:
+
+```yaml
+url: /hacsfiles/ld2450-room-card/ld2450-room-card.js
+type: module
+```
+
+## Configuration
+
+Add it from the card picker ("LD2450 Room Card") and use the visual editor, or
+in YAML:
+
+```yaml
+type: custom:ld2450-room-card
+device: <your mmWave device>   # required
+name: Laundry
+room_width: 3090               # mm, along the wall the sensor is mounted on
+room_depth: 2120               # mm, straight out from the sensor
+sensor_offset: 500             # mm, sensor's distance from the left edge
+targets: 3                     # 1–3
+flip_x: false                  # mirror left/right if the sign is reversed
+show_distance: true            # print each target's distance on its dot
+```
+
+| Option          | Default        | Description |
+| --------------- | -------------- | ----------- |
+| `device`        | —              | **Required.** The radar's device; the card discovers its target sensors. |
+| `name`          | —              | Card title. Omit for no header. |
+| `room_width`    | `3000`         | Room size (mm) **along** the wall the sensor is mounted on — the sensor's X axis. |
+| `room_depth`    | `3000`         | Room size (mm) **out from** that wall — the sensor's Y axis. |
+| `sensor_offset` | `room_width/2` | How far along the wall the sensor sits, from the left edge (mm). Centre it by leaving this out. |
+| `targets`       | `3`            | How many targets to plot (1–3). |
+| `flip_x`        | `false`        | Mirror the X axis. The LD2450's X sign depends on how the board is physically mounted — flip this if targets appear on the wrong side. |
+| `show_distance` | `true`         | Show each target's distance on its dot. When off, dots are plain markers. |
+
+### The coordinate frame
+
+The LD2450 reports each target as **X** (lateral, mm, ±) and **Y** (distance
+from the sensor, mm, ≥ 0), with the sensor itself at the origin. The card maps
+that onto the room using `sensor_offset`: the mounting wall spans
+`-sensor_offset` (left edge) to `room_width - sensor_offset` (right edge), and
+depth runs `0 → room_depth`.
+
+If someone standing by the **left** wall shows up on the **right** of the plan,
+set `flip_x: true` (or vice-versa) — that's the only ambiguity, and it comes
+from the sensor's physical orientation.
+
+### Theming
+
+Dot colours and the room fill fall back to sensible values but can be themed:
+
+```yaml
+ld2450-t1-color: "#e5484d"
+ld2450-t2-color: "#4c6ef5"
+ld2450-t3-color: "#2f9e44"
+ld2450-room-fill: "var(--secondary-background-color)"
+```
+
+## License
+
+[MIT](LICENSE)

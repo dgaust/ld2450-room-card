@@ -1,0 +1,9 @@
+# Normalise everything to LF in the repository. Without this, committing from
+# Windows with core.autocrlf warns on every text file.
+* text=auto eol=lf
+
+# Never munge binaries if any are added later.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

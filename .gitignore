@@ -1,0 +1,5 @@
+.env
+.env.local
+*.token
+__pycache__/
+node_modules/
