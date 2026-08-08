@@ -12,9 +12,15 @@
  * lateral (mm, +/-), Y is distance straight out from the wall it is mounted
  * on (mm, always >= 0). `sensor_offset` is how far along the mounting wall
  * the sensor sits, so the wall spans -sensor_offset .. room_width-offset.
+ *
+ * `sensor_angle` (degrees) handles a radar that isn't mounted square to the
+ * wall: it is the tilt of the boresight away from the wall-normal (0 = facing
+ * straight into the room, positive = rotated toward the room's right). Each
+ * reported (x, y) is rotated by that angle at the sensor pivot before it is
+ * placed, so the plotted position matches where the person actually is.
  */
 
-const CARD_VERSION = "1.0.0";
+const CARD_VERSION = "1.1.0";
 
 /* Plain text, not a %c banner: console styling only takes literal colours
  * and nothing here should hardcode one. */
@@ -135,6 +141,7 @@ class Ld2450RoomCard extends HTMLElement {
       room_depth: depth,
       sensor_offset:
         config.sensor_offset != null ? Number(config.sensor_offset) : width / 2,
+      sensor_angle: Number(config.sensor_angle) || 0,
       targets: Math.min(3, Math.max(1, Number(config.targets) || 3)),
       flip_x: !!config.flip_x,
       show_distance: config.show_distance !== false,
@@ -177,6 +184,7 @@ class Ld2450RoomCard extends HTMLElement {
         this._config.room_width,
         this._config.room_depth,
         this._config.sensor_offset,
+        this._config.sensor_angle,
         this._config.flip_x,
         this._config.show_distance,
         n,
@@ -212,6 +220,15 @@ class Ld2450RoomCard extends HTMLElement {
     const rx = Math.round(Math.min(W, D) * 0.03);
     const fontSize = Math.round(vbW * 0.032);
 
+    /* Boresight indicator: a short line from the sensor showing which way it
+     * actually looks. Straight down the room at angle 0, tilting toward +X as
+     * the angle grows — the same rotation the coordinates get, so a target
+     * dead-ahead of the radar lands on this line. */
+    const a = (c.sensor_angle * Math.PI) / 180;
+    const bl = Math.round(Math.min(W, D) * 0.16);
+    const bx = sx + bl * Math.sin(a);
+    const by = M + bl * Math.cos(a);
+
     this._geo = { M, vbW, vbH, W, D, off };
 
     const dots = Array.from({ length: n })
@@ -240,6 +257,9 @@ class Ld2450RoomCard extends HTMLElement {
             <rect x="${M}" y="${M}" width="${W}" height="${D}" rx="${rx}"
               fill="var(--ld2450-room-fill, var(--secondary-background-color))"
               stroke="var(--divider-color)" stroke-width="${stroke}"/>
+            <line x1="${sx}" y1="${M}" x2="${bx}" y2="${by}"
+              stroke="var(--secondary-text-color)" stroke-width="${Math.max(2, Math.round(M * 0.08))}"
+              stroke-linecap="round"/>
             <circle cx="${sx}" cy="${M}" r="${Math.round(M * 0.3)}"
               fill="var(--secondary-text-color)"/>
             <text x="${sx}" y="${M + fontSize * 1.5}" fill="var(--secondary-text-color)"
@@ -275,10 +295,18 @@ class Ld2450RoomCard extends HTMLElement {
       }
 
       const ex = c.flip_x ? -x : x;
+      /* Rotate the sensor-frame point into room axes when the radar is
+       * mounted at an angle to the wall. Positive angle tilts the boresight
+       * toward +X; the target's lateral position becomes rx, its depth ry. */
+      const a = (c.sensor_angle * Math.PI) / 180;
+      const ca = Math.cos(a);
+      const sa = Math.sin(a);
+      const rx = ex * ca + y * sa;
+      const ry = -ex * sa + y * ca;
       /* Clamp inside the walls so noise or an out-of-room reflection rides
        * the edge instead of flying off the card. */
-      let px = g.M + Math.min(Math.max(ex + c.sensor_offset, 0), g.W);
-      let py = g.M + Math.min(Math.max(y, 0), g.D);
+      let px = g.M + Math.min(Math.max(rx + c.sensor_offset, 0), g.W);
+      let py = g.M + Math.min(Math.max(ry, 0), g.D);
 
       dot.style.left = (px / g.vbW) * 100 + "%";
       dot.style.top = (py / g.vbH) * 100 + "%";
@@ -373,6 +401,10 @@ const EDITOR_SCHEMA = [
     name: "sensor_offset",
     selector: { number: { min: 0, max: 10000, step: 10, unit_of_measurement: "mm", mode: "box" } },
   },
+  {
+    name: "sensor_angle",
+    selector: { number: { min: -90, max: 90, step: 1, unit_of_measurement: "°", mode: "box" } },
+  },
   { name: "targets", selector: { number: { min: 1, max: 3, step: 1, mode: "box" } } },
   { name: "flip_x", selector: { boolean: {} } },
   { name: "show_distance", selector: { boolean: {} } },
@@ -384,6 +416,7 @@ const EDITOR_LABELS = {
   room_width: "Room width (along sensor wall)",
   room_depth: "Room depth (out from sensor)",
   sensor_offset: "Sensor offset from left edge",
+  sensor_angle: "Sensor angle off the wall (°)",
   targets: "Targets to plot (1–3)",
   flip_x: "Flip X (mirror left/right)",
   show_distance: "Show distance on each dot",

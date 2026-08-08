@@ -48,6 +48,7 @@ name: Laundry
 room_width: 3090               # mm, along the wall the sensor is mounted on
 room_depth: 2120               # mm, straight out from the sensor
 sensor_offset: 500             # mm, sensor's distance from the left edge
+sensor_angle: 0                # degrees the sensor is tilted off the wall-normal
 targets: 3                     # 1–3
 flip_x: false                  # mirror left/right if the sign is reversed
 show_distance: true            # print each target's distance on its dot
@@ -60,6 +61,7 @@ show_distance: true            # print each target's distance on its dot
 | `room_width`    | `3000`         | Room size (mm) **along** the wall the sensor is mounted on — the sensor's X axis. |
 | `room_depth`    | `3000`         | Room size (mm) **out from** that wall — the sensor's Y axis. |
 | `sensor_offset` | `room_width/2` | How far along the wall the sensor sits, from the left edge (mm). Centre it by leaving this out. |
+| `sensor_angle`  | `0`            | Tilt of the sensor's boresight off the wall-normal, in degrees. `0` faces straight into the room; positive rotates toward the room's **right**. Each target is rotated by this angle so the plot matches the real position. |
 | `targets`       | `3`            | How many targets to plot (1–3). |
 | `flip_x`        | `false`        | Mirror the X axis. The LD2450's X sign depends on how the board is physically mounted — flip this if targets appear on the wrong side. |
 | `show_distance` | `true`         | Show each target's distance on its dot. When off, dots are plain markers. |
@@ -75,6 +77,13 @@ depth runs `0 → room_depth`.
 If someone standing by the **left** wall shows up on the **right** of the plan,
 set `flip_x: true` (or vice-versa) — that's the only ambiguity, and it comes
 from the sensor's physical orientation.
+
+If the radar isn't mounted square to the wall, set `sensor_angle` to the tilt
+of its boresight off the perpendicular. The card rotates every reported point
+by that angle at the sensor pivot before placing it, so the plot lands in the
+right room position. The short line on the sensor marker shows the configured
+facing direction — tune the angle until it points the way the radar really
+looks (and if the whole scene rotates the wrong way, negate the angle).
 
 ### Theming
 
