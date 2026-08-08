@@ -93,12 +93,14 @@ way, negate the angle). The line is hidden on the live dashboard.
 If the device exposes the LD2450's zone-coordinate number entities (the ESPHome
 `number:` platform: `zone_N_x1` / `zone_N_y1` / `zone_N_x2` / `zone_N_y2`), the
 card draws each configured zone as a dashed rectangle **while you're editing the
-card** — projected through the same flip/rotate/offset as the targets, so an
-angled mount rotates the zone correctly. Zones are coloured by the `zone_type`
-select: red for `Filter`, blue for `Detection`, grey otherwise. Unset or
-zero-area zones aren't drawn, and nothing zone-related shows on the live
-dashboard. There's no configuration — the zones are read straight from the
-device.
+card**. Unlike the target dots, zones are **not** rotated or flipped by
+`sensor_angle`/`flip_x` — they're defined in the sensor's own x/y frame (x
+lateral, y straight ahead), so they're drawn as configured: anchored at the
+sensor and facing straight into the room, with only `sensor_offset` placing
+them along the wall. Zones are coloured by the `zone_type` select: red for
+`Filter`, blue for `Detection`, grey otherwise. Unset or zero-area zones aren't
+drawn, and nothing zone-related shows on the live dashboard. There's no
+configuration — the zones are read straight from the device.
 
 ### Theming
 

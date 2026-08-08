@@ -20,7 +20,7 @@
  * placed, so the plotted position matches where the person actually is.
  */
 
-const CARD_VERSION = "1.2.0";
+const CARD_VERSION = "1.2.1";
 
 /* Plain text, not a %c banner: console styling only takes literal colours
  * and nothing here should hardcode one. */
@@ -249,6 +249,16 @@ class Ld2450RoomCard extends HTMLElement {
     return { vx: g.M + rx + c.sensor_offset, vy: g.M + ry };
   }
 
+  /* Zones live in the sensor's own x/y frame (x lateral, y straight ahead) and
+   * are configured directly against those raw numbers, so they're drawn as
+   * configured — anchored at the sensor, facing straight into the room —
+   * WITHOUT the flip_x/sensor_angle the dots get. Only the along-wall offset
+   * places them relative to where the sensor sits on the plan. */
+  _projectZone(x, y) {
+    const g = this._geo;
+    return { vx: g.M + this._config.sensor_offset + x, vy: g.M + y };
+  }
+
   _build(n) {
     const c = this._config;
     const W = c.room_width;
@@ -382,10 +392,10 @@ class Ld2450RoomCard extends HTMLElement {
     this._updateZones();
   }
 
-  /* Draw the configured LD2450 region-filter zones as polygons in the room
-   * frame. Each zone's corners are projected the same way as target points, so
-   * an angled mount rotates the rectangle correctly. Coloured by mode (Filter
-   * red, Detection blue, else grey). Only visible in the editor via CSS. */
+  /* Draw the configured LD2450 region-filter zones. Their corners are placed in
+   * the sensor's raw x/y frame (see _projectZone) — NOT rotated/flipped like
+   * the target dots — because the zone is defined against those raw numbers.
+   * Coloured by mode (Filter red, Detection blue, else grey). Editor-only. */
   _updateZones() {
     const polys = this._zonePolys || [];
     const lbls = this._zoneLbls || [];
@@ -424,7 +434,7 @@ class Ld2450RoomCard extends HTMLElement {
       let cy = 0;
       const pts = [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
         .map(([mx, my]) => {
-          const p = this._projectVB(mx, my);
+          const p = this._projectZone(mx, my);
           cx += p.vx;
           cy += p.vy;
           return `${p.vx.toFixed(1)},${p.vy.toFixed(1)}`;
