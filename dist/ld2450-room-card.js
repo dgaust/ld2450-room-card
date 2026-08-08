@@ -20,7 +20,7 @@
  * placed, so the plotted position matches where the person actually is.
  */
 
-const CARD_VERSION = "1.2.1";
+const CARD_VERSION = "1.2.2";
 
 /* Plain text, not a %c banner: console styling only takes literal colours
  * and nothing here should hardcode one. */
@@ -249,14 +249,19 @@ class Ld2450RoomCard extends HTMLElement {
     return { vx: g.M + rx + c.sensor_offset, vy: g.M + ry };
   }
 
-  /* Zones live in the sensor's own x/y frame (x lateral, y straight ahead) and
-   * are configured directly against those raw numbers, so they're drawn as
-   * configured — anchored at the sensor, facing straight into the room —
-   * WITHOUT the flip_x/sensor_angle the dots get. Only the along-wall offset
-   * places them relative to where the sensor sits on the plan. */
+  /* Zones are rigidly attached to the sensor's face, so they rotate WITH it:
+   * apply the same sensor_angle rotation about the sensor pivot and the
+   * along-wall offset, but NOT the flip_x mirroring — that's a lateral-sign
+   * correction for reading the dots, not a physical rotation of the sensor. */
   _projectZone(x, y) {
+    const c = this._config;
     const g = this._geo;
-    return { vx: g.M + this._config.sensor_offset + x, vy: g.M + y };
+    const a = (c.sensor_angle * Math.PI) / 180;
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    const rx = x * ca + y * sa;
+    const ry = -x * sa + y * ca;
+    return { vx: g.M + rx + c.sensor_offset, vy: g.M + ry };
   }
 
   _build(n) {
@@ -392,10 +397,10 @@ class Ld2450RoomCard extends HTMLElement {
     this._updateZones();
   }
 
-  /* Draw the configured LD2450 region-filter zones. Their corners are placed in
-   * the sensor's raw x/y frame (see _projectZone) — NOT rotated/flipped like
-   * the target dots — because the zone is defined against those raw numbers.
-   * Coloured by mode (Filter red, Detection blue, else grey). Editor-only. */
+  /* Draw the configured LD2450 region-filter zones. Corners are placed via
+   * _projectZone — rotated with the sensor angle and anchored at the sensor,
+   * but not mirrored by flip_x like the target dots. Coloured by mode (Filter
+   * red, Detection blue, else grey). Editor-only. */
   _updateZones() {
     const polys = this._zonePolys || [];
     const lbls = this._zoneLbls || [];
