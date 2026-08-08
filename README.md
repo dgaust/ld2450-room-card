@@ -81,9 +81,10 @@ from the sensor's physical orientation.
 If the radar isn't mounted square to the wall, set `sensor_angle` to the tilt
 of its boresight off the perpendicular. The card rotates every reported point
 by that angle at the sensor pivot before placing it, so the plot lands in the
-right room position. The short line on the sensor marker shows the configured
-facing direction — tune the angle until it points the way the radar really
-looks (and if the whole scene rotates the wrong way, negate the angle).
+right room position. While you're **editing the card**, a short line on the
+sensor marker shows the configured facing direction — tune the angle until it
+points the way the radar really looks (and if the whole scene rotates the wrong
+way, negate the angle). The line is hidden on the live dashboard.
 
 ### Theming
 

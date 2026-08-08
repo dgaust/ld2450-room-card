@@ -20,7 +20,7 @@
  * placed, so the plotted position matches where the person actually is.
  */
 
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.1.1";
 
 /* Plain text, not a %c banner: console styling only takes literal colours
  * and nothing here should hardcode one. */
@@ -102,6 +102,10 @@ const BASE_CSS = `
   .pill-present.on { color:var(--primary-text-color); }
   .room { position:relative; width:100%; }
   .plan { width:100%; height:auto; display:block; }
+  /* The boresight is a setup aid — only shown while editing the card, when HA
+   * sets the host's preview property (reflected to the [preview] attr). */
+  .boresight { display:none; }
+  :host([preview]) .boresight { display:inline; }
   .dot {
     position:absolute; transform:translate(-50%,-50%);
     display:none; align-items:center; justify-content:center;
@@ -128,6 +132,13 @@ const BASE_CSS = `
  * ------------------------------------------------------------------ */
 
 class Ld2450RoomCard extends HTMLElement {
+  /* HA sets this true when the card is rendered in the editor preview. Reflect
+   * it to an attribute so CSS (:host([preview])) can reveal the boresight
+   * indicator only while the card is being configured. */
+  set preview(value) {
+    this.toggleAttribute("preview", !!value);
+  }
+
   setConfig(config) {
     if (!config || !config.device) {
       throw new Error("Select the mmWave device in the card editor.");
@@ -257,7 +268,7 @@ class Ld2450RoomCard extends HTMLElement {
             <rect x="${M}" y="${M}" width="${W}" height="${D}" rx="${rx}"
               fill="var(--ld2450-room-fill, var(--secondary-background-color))"
               stroke="var(--divider-color)" stroke-width="${stroke}"/>
-            <line x1="${sx}" y1="${M}" x2="${bx}" y2="${by}"
+            <line class="boresight" x1="${sx}" y1="${M}" x2="${bx}" y2="${by}"
               stroke="var(--secondary-text-color)" stroke-width="${Math.max(2, Math.round(M * 0.08))}"
               stroke-linecap="round"/>
             <circle cx="${sx}" cy="${M}" r="${Math.round(M * 0.3)}"
