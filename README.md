@@ -54,6 +54,8 @@ sensor_angle: 0                # degrees the sensor is tilted off the wall-norma
 targets: 3                     # 1–3
 flip_x: false                  # mirror left/right if the sign is reversed
 show_distance: true            # print each target's distance on its dot
+animate: true                  # slide dots to their new position
+animation_ms: 500              # slide duration in milliseconds
 ```
 
 | Option          | Default        | Description |
@@ -67,6 +69,8 @@ show_distance: true            # print each target's distance on its dot
 | `targets`       | `3`            | How many targets to plot (1–3). |
 | `flip_x`        | `false`        | Mirror the X axis. The LD2450's X sign depends on how the board is physically mounted — flip this if targets appear on the wrong side. |
 | `show_distance` | `true`         | Show each target's distance on its dot. When off, dots are plain markers. |
+| `animate`       | `true`         | Slide dots to each new position instead of snapping. A target that reappears jumps to its first spot rather than streaking across the card. |
+| `animation_ms`  | `500`          | Slide duration in milliseconds. Roughly match your radar's update rate — shorter tracks more tightly, longer is smoother but lags. `0` disables (same as `animate: false`). |
 
 ### The coordinate frame
 

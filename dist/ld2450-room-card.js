@@ -20,7 +20,7 @@
  * placed, so the plotted position matches where the person actually is.
  */
 
-const CARD_VERSION = "1.2.2";
+const CARD_VERSION = "1.3.0";
 
 /* Plain text, not a %c banner: console styling only takes literal colours
  * and nothing here should hardcode one. */
@@ -132,7 +132,11 @@ const BASE_CSS = `
     background:var(--c); color:#fff;
     font-size:11px; font-weight:500; line-height:1;
     box-shadow:0 1px 3px rgba(0,0,0,.35);
+    transition: left var(--dot-anim,0s) ease-out, top var(--dot-anim,0s) ease-out;
   }
+  /* Applied for one frame when a target first appears, so it jumps to its
+   * starting spot instead of sliding in from a stale position. */
+  .dot.snap { transition: none; }
   .dot.on { display:inline-flex; }
   .dot.pill { min-width:14px; height:20px; padding:0 7px; border-radius:11px; }
   .dot.bare { width:14px; height:14px; padding:0; border-radius:50%; }
@@ -175,6 +179,9 @@ class Ld2450RoomCard extends HTMLElement {
       targets: Math.min(3, Math.max(1, Number(config.targets) || 3)),
       flip_x: !!config.flip_x,
       show_distance: config.show_distance !== false,
+      animate: config.animate !== false,
+      animation_ms:
+        Number(config.animation_ms) >= 0 ? Number(config.animation_ms) : 500,
     };
     /* Force a rebuild and drop any stale DOM so the next hass renders fresh. */
     this._sig = null;
@@ -217,6 +224,8 @@ class Ld2450RoomCard extends HTMLElement {
         this._config.sensor_angle,
         this._config.flip_x,
         this._config.show_distance,
+        this._config.animate,
+        this._config.animation_ms,
         n,
       ]);
       if (sig !== this._sig) {
@@ -322,8 +331,10 @@ class Ld2450RoomCard extends HTMLElement {
         `<span class="pill-present" id="present">—</span></div>`
       : "";
 
+    const dur = c.animate ? c.animation_ms + "ms" : "0s";
+
     this._shadow().innerHTML = `
-      <style>${BASE_CSS}</style>
+      <style>${BASE_CSS}:host{--dot-anim:${dur}}</style>
       <ha-card>
         ${head}
         <div class="room">
@@ -379,9 +390,22 @@ class Ld2450RoomCard extends HTMLElement {
       const p = this._projectVB(x, y);
       const px = Math.min(Math.max(p.vx, g.M), g.M + g.W);
       const py = Math.min(Math.max(p.vy, g.M), g.M + g.D);
+      const left = (px / g.vbW) * 100 + "%";
+      const top = (py / g.vbH) * 100 + "%";
 
-      dot.style.left = (px / g.vbW) * 100 + "%";
-      dot.style.top = (py / g.vbH) * 100 + "%";
+      /* First frame this target is visible, jump straight to its spot; only
+       * animate the slide once it's already on screen, so a reappearing target
+       * doesn't streak across the card from a stale position. */
+      if (!dot.classList.contains("on")) {
+        dot.classList.add("snap");
+        dot.style.left = left;
+        dot.style.top = top;
+        void dot.offsetWidth; // flush the jump before re-enabling the transition
+        dot.classList.remove("snap");
+      } else {
+        dot.style.left = left;
+        dot.style.top = top;
+      }
       if (c.show_distance) dot.querySelector(".lbl").textContent = distanceLabel(hass, t);
       dot.classList.add("on");
     }
@@ -546,6 +570,11 @@ const EDITOR_SCHEMA = [
   { name: "targets", selector: { number: { min: 1, max: 3, step: 1, mode: "box" } } },
   { name: "flip_x", selector: { boolean: {} } },
   { name: "show_distance", selector: { boolean: {} } },
+  { name: "animate", selector: { boolean: {} } },
+  {
+    name: "animation_ms",
+    selector: { number: { min: 0, max: 3000, step: 50, unit_of_measurement: "ms", mode: "box" } },
+  },
 ];
 
 const EDITOR_LABELS = {
@@ -558,6 +587,8 @@ const EDITOR_LABELS = {
   targets: "Targets to plot (1–3)",
   flip_x: "Flip X (mirror left/right)",
   show_distance: "Show distance on each dot",
+  animate: "Animate movement",
+  animation_ms: "Animation duration (ms)",
 };
 
 class Ld2450RoomCardEditor extends HTMLElement {
