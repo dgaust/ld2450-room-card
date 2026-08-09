@@ -20,7 +20,7 @@
  * placed, so the plotted position matches where the person actually is.
  */
 
-const CARD_VERSION = "1.3.0";
+const CARD_VERSION = "1.4.0";
 
 /* Plain text, not a %c banner: console styling only takes literal colours
  * and nothing here should hardcode one. */
@@ -127,17 +127,19 @@ const BASE_CSS = `
   :host([preview]) .zone-lbl.on { display:inline; }
   .dot {
     position:absolute; transform:translate(-50%,-50%);
-    display:none; align-items:center; justify-content:center;
+    display:inline-flex; opacity:0; align-items:center; justify-content:center;
     box-sizing:border-box; pointer-events:none;
     background:var(--c); color:#fff;
     font-size:11px; font-weight:500; line-height:1;
     box-shadow:0 1px 3px rgba(0,0,0,.35);
-    transition: left var(--dot-anim,0s) ease-out, top var(--dot-anim,0s) ease-out;
+    transition: left var(--dot-anim,0s) ease-out, top var(--dot-anim,0s) ease-out,
+                opacity var(--dot-fade,0s) ease;
   }
   /* Applied for one frame when a target first appears, so it jumps to its
-   * starting spot instead of sliding in from a stale position. */
+   * starting spot instead of sliding in from a stale position. The opacity
+   * fade still runs — it happens after .snap is removed. */
   .dot.snap { transition: none; }
-  .dot.on { display:inline-flex; }
+  .dot.on { opacity:1; }
   .dot.pill { min-width:14px; height:20px; padding:0 7px; border-radius:11px; }
   .dot.bare { width:14px; height:14px; padding:0; border-radius:50%; }
   .dot.bare .lbl { display:none; }
@@ -182,6 +184,7 @@ class Ld2450RoomCard extends HTMLElement {
       animate: config.animate !== false,
       animation_ms:
         Number(config.animation_ms) >= 0 ? Number(config.animation_ms) : 500,
+      fade_ms: Number(config.fade_ms) >= 0 ? Number(config.fade_ms) : 300,
     };
     /* Force a rebuild and drop any stale DOM so the next hass renders fresh. */
     this._sig = null;
@@ -226,6 +229,7 @@ class Ld2450RoomCard extends HTMLElement {
         this._config.show_distance,
         this._config.animate,
         this._config.animation_ms,
+        this._config.fade_ms,
         n,
       ]);
       if (sig !== this._sig) {
@@ -332,9 +336,10 @@ class Ld2450RoomCard extends HTMLElement {
       : "";
 
     const dur = c.animate ? c.animation_ms + "ms" : "0s";
+    const fade = c.fade_ms + "ms";
 
     this._shadow().innerHTML = `
-      <style>${BASE_CSS}:host{--dot-anim:${dur}}</style>
+      <style>${BASE_CSS}:host{--dot-anim:${dur};--dot-fade:${fade}}</style>
       <ha-card>
         ${head}
         <div class="room">
@@ -575,6 +580,10 @@ const EDITOR_SCHEMA = [
     name: "animation_ms",
     selector: { number: { min: 0, max: 3000, step: 50, unit_of_measurement: "ms", mode: "box" } },
   },
+  {
+    name: "fade_ms",
+    selector: { number: { min: 0, max: 3000, step: 50, unit_of_measurement: "ms", mode: "box" } },
+  },
 ];
 
 const EDITOR_LABELS = {
@@ -589,6 +598,7 @@ const EDITOR_LABELS = {
   show_distance: "Show distance on each dot",
   animate: "Animate movement",
   animation_ms: "Animation duration (ms)",
+  fade_ms: "Fade in/out duration (ms)",
 };
 
 class Ld2450RoomCardEditor extends HTMLElement {

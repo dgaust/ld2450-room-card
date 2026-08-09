@@ -56,6 +56,7 @@ flip_x: false                  # mirror left/right if the sign is reversed
 show_distance: true            # print each target's distance on its dot
 animate: true                  # slide dots to their new position
 animation_ms: 500              # slide duration in milliseconds
+fade_ms: 300                   # fade dots in/out as targets appear/vanish
 ```
 
 | Option          | Default        | Description |
@@ -71,6 +72,7 @@ animation_ms: 500              # slide duration in milliseconds
 | `show_distance` | `true`         | Show each target's distance on its dot. When off, dots are plain markers. |
 | `animate`       | `true`         | Slide dots to each new position instead of snapping. A target that reappears jumps to its first spot rather than streaking across the card. |
 | `animation_ms`  | `500`          | Slide duration in milliseconds. Roughly match your radar's update rate — shorter tracks more tightly, longer is smoother but lags. `0` disables (same as `animate: false`). |
+| `fade_ms`       | `300`          | Fade-in/out duration in milliseconds as a target is detected or lost, so dots don't blink on and off. `0` disables the fade. |
 
 ### The coordinate frame
 
